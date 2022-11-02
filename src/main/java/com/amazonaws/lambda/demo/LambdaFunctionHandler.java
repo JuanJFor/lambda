@@ -10,6 +10,7 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.Table;
+import com.amazonaws.services.dynamodbv2.document.spec.PutItemSpec;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.sns.AmazonSNS;
@@ -24,10 +25,15 @@ import com.amazonaws.services.sns.model.DeletePlatformApplicationResult;
 
 import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
-import software.amazon.awssdk.regions.Region;
+
 import software.amazon.awssdk.services.sns.SnsClient;
 
 import software.amazon.awssdk.services.sns.model.SnsException;
+
+
+import com.amazonaws.regions.Region;
+import com.amazonaws.regions.Regions;
+
 
 public class LambdaFunctionHandler implements RequestHandler<Map<String, String>, String> {
 
@@ -61,20 +67,20 @@ public class LambdaFunctionHandler implements RequestHandler<Map<String, String>
 		
 		
 		
-		
-		
 		Table table =this.dynamoDb.getTable(DYNAMODB_TABLE_NAME);
 		
 		
-		Item item = table.getItem("token",token);
+		Item item=new Item();
+
+		Item itemsearch = table.getItem("user",user,"arn",platformApplicationArn);
 		
 		AmazonSNS client = AmazonSNSClientBuilder.standard().build();
 		
 		
-		if(item!=null) {
+		if(itemsearch!=null) {
 			LOGGER.info("Delete request Endpoint");
-			DeleteEndpointResult resultd = deleteEndpoint(client, item.getString("arnendpoint"));
-			table.deleteItem("token", token);
+			DeleteEndpointResult resultd = deleteEndpoint(client, itemsearch.getString("arnendpoint"));
+			table.deleteItem("user",user,"arn",platformApplicationArn);
 		}
 		
 		LOGGER.info("Create request Endpoint");
@@ -84,12 +90,9 @@ public class LambdaFunctionHandler implements RequestHandler<Map<String, String>
 		item.withString("user", user);
 		item.withString("arn", platformApplicationArn);
 		
-		table.putItem(item);
 		
-
-
-		
-
+		this.dynamoDb.getTable(DYNAMODB_TABLE_NAME).putItem(item);
+        		
 		
 
 		return "Success";
@@ -135,7 +138,8 @@ public class LambdaFunctionHandler implements RequestHandler<Map<String, String>
 
 	private void initDynamoDbClient() {
 		AmazonDynamoDBClient client = new AmazonDynamoDBClient();
-		client.setRegion(REGION.getCurrentRegion());
+
+		client.setRegion(Region.getRegion(REGION));
 		this.dynamoDb = new DynamoDB(client);
 	}
 
