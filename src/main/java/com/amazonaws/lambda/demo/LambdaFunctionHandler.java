@@ -22,8 +22,9 @@ import software.amazon.awssdk.services.sns.model.SnsException;
 
 public class LambdaFunctionHandler implements RequestHandler<Map<String, String>, String> {
 
-	private static final String NUMERATOR_KEY = "numerator";
-	private static final String DENOMINATOR_KEY = "denominator";
+	private static final String USER_KEY = "user";
+	private static final String TOKEN_KEY = "token";
+	private static final String ARN_KEY = "arn";
 
 	private static final Logger LOGGER = Logger.getLogger(LambdaFunctionHandler.class.getName());
 
@@ -32,10 +33,16 @@ public class LambdaFunctionHandler implements RequestHandler<Map<String, String>
 		LOGGER.info("Handling request");
 
 		LOGGER.info(values.toString());
+		
+        if(!values.containsKey(USER_KEY)||!values.containsKey(TOKEN_KEY)||!values.containsKey(ARN_KEY)) {
+            return "Faltan parametros de validacion";
+        }
+		
 
 
-		String token = "cwPfsZnPSMaNmzGF4Aggfi:APA91bHr0pDM-BTdVUvkn0BXoe1qLnmAEIW1llHNEhf7saTNE-fKiJ-OB9aU4JD0wp8BSeJHmtrwVMk8owyjhw510hJ1Xirq6STdBxiOoZHkc1WCXqGnZKjf3UDA5yKty4mzlc14VYTm";
-		String platformApplicationArn = "arn:aws:sns:us-east-1:951069153692:app/GCM/Coffe-shop";
+		String token = values.get(TOKEN_KEY);
+		String user=values.get(USER_KEY);
+		String platformApplicationArn = values.get(ARN_KEY);
 
 		AmazonSNS client = AmazonSNSClientBuilder.standard().build();
 
@@ -43,16 +50,33 @@ public class LambdaFunctionHandler implements RequestHandler<Map<String, String>
 		LOGGER.info("Create request");
 		
 		
-		CreatePlatformEndpointRequest platformEndpointRequest = new CreatePlatformEndpointRequest();
-		platformEndpointRequest.setPlatformApplicationArn(platformApplicationArn);
-		platformEndpointRequest.setToken(token);
-
-		CreatePlatformEndpointResult result = client.createPlatformEndpoint(platformEndpointRequest);
-		LOGGER.info("Amazon Push reg result: " + result);
+		createEndpoint(client, token, platformApplicationArn);
 		
-		return "Amazon Push reg result: " + result;
+		return "Success";
 
 	}
+	
+	
+	
+    public static String createEndpoint(AmazonSNS client, String token, String platformApplicationArn){
+
+    	String resultmsg = null;
+
+        try {
+    		CreatePlatformEndpointRequest platformEndpointRequest = new CreatePlatformEndpointRequest();
+    		platformEndpointRequest.setPlatformApplicationArn(platformApplicationArn);
+    		platformEndpointRequest.setToken(token);
+
+    		CreatePlatformEndpointResult result = client.createPlatformEndpoint(platformEndpointRequest);
+    		LOGGER.info("Amazon Push reg result: " + result);
+    		
+    		resultmsg="Amazon Push reg result: " + result;
+    		
+        } catch ( SnsException e) {
+        	resultmsg="Amazon fail Push reg result: " + e.awsErrorDetails().errorMessage();
+        }
+        return resultmsg;
+    }
 
 
 
