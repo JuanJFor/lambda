@@ -1,5 +1,6 @@
 package com.amazonaws.lambda.demo;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -17,17 +18,20 @@ import com.amazonaws.services.sns.model.CreatePlatformEndpointRequest;
 import com.amazonaws.services.sns.model.CreatePlatformEndpointResult;
 import com.amazonaws.services.sns.model.DeleteEndpointRequest;
 import com.amazonaws.services.sns.model.DeleteEndpointResult;
+import com.amazonaws.services.sns.model.SubscribeRequest;
+import com.amazonaws.services.sns.model.SubscribeResult;
+import com.amazonaws.services.sns.model.UnsubscribeResult;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 import software.amazon.awssdk.services.sns.model.SnsException;
-
 
 public class LambdaFunctionHandler implements RequestHandler<Map<String, String>, String> {
 
 	private static final String USER_KEY = "user";
 	private static final String TOKEN_KEY = "token";
 	private static final String ARN_KEY = "arn";
+	private static final String ARN_TOPIC_KEY = "arntopic";
 
 	private DynamoDB dynamoDb;
 	private String DYNAMODB_TABLE_NAME = "MobileTokens";
@@ -43,89 +47,95 @@ public class LambdaFunctionHandler implements RequestHandler<Map<String, String>
 
 		this.initDynamoDbClient();
 
-		
-
-		if (!values.containsKey(USER_KEY) || !values.containsKey(TOKEN_KEY) || !values.containsKey(ARN_KEY)) {
+		if (!values.containsKey(USER_KEY) || !values.containsKey(TOKEN_KEY) || !values.containsKey(ARN_KEY)
+				|| !values.containsKey(ARN_TOPIC_KEY)) {
 			return "Faltan parametros de validacion";
 		}
 
 		String token = values.get(TOKEN_KEY);
 		String user = values.get(USER_KEY);
 		String platformApplicationArn = values.get(ARN_KEY);
-		
-		
-		
-		Table table =this.dynamoDb.getTable(DYNAMODB_TABLE_NAME);
-		
-		
-		Item item=new Item();
+		String topicArn = values.get(ARN_TOPIC_KEY);
 
-		Item itemsearch = table.getItem("user",user,"arn",platformApplicationArn);
-		
+		Table table = this.dynamoDb.getTable(DYNAMODB_TABLE_NAME);
+
+		Item item = new Item();
+
+		Item itemsearch = table.getItem("user", user, "arn", platformApplicationArn);
+
 		AmazonSNS client = AmazonSNSClientBuilder.standard().build();
-		
-		
-		if(itemsearch!=null) {
+
+		if (itemsearch != null) {
 			LOGGER.info("Delete request Endpoint");
-			DeleteEndpointResult resultd = deleteEndpoint(client, itemsearch.getString("arnendpoint"));
-			table.deleteItem("user",user,"arn",platformApplicationArn);
+			DeleteEndpointResult resultd = deleteEndpoint(client, itemsearch.getString("arnendpoint"), topicArn,
+					itemsearch.getString("arntopicendpoint"));
+			table.deleteItem("user", user, "arn", platformApplicationArn);
 		}
-		
+
 		LOGGER.info("Create request Endpoint");
-		CreatePlatformEndpointResult resultc = createEndpoint(client, token, platformApplicationArn);
-		item.withString("arnendpoint", resultc.getEndpointArn());
-		item.withString("token", token);
-		item.withString("user", user);
-		item.withString("arn", platformApplicationArn);
-		
-		
+		Map map = createEndpoint(client, token, platformApplicationArn, topicArn);
+		item.withString("arnendpoint", ((CreatePlatformEndpointResult) map.get("resultEndpoint")).getEndpointArn());
+		item.withString(TOKEN_KEY, token);
+		item.withString(USER_KEY, user);
+		item.withString(ARN_KEY, platformApplicationArn);
+		item.withString(ARN_TOPIC_KEY, topicArn);
+		item.withString("arntopicendpoint", ((SubscribeResult) map.get("resultsubcirbe")).getSubscriptionArn());
+
 		this.dynamoDb.getTable(DYNAMODB_TABLE_NAME).putItem(item);
 
-		Gson gson = new Gson();		
-		
-        JsonObject jsonObject = new JsonObject();
-        jsonObject.addProperty("response", "Success");
-		
-		
+		Gson gson = new Gson();
+
+		JsonObject jsonObject = new JsonObject();
+		jsonObject.addProperty("response", "Success");
+
 		return gson.toJson(jsonObject);
 
 	}
 
-	public static CreatePlatformEndpointResult createEndpoint(AmazonSNS client, String token,
-			String platformApplicationArn) {
+	public static Map createEndpoint(AmazonSNS client, String token, String platformApplicationArn, String topicArn) {
 
-		CreatePlatformEndpointResult result = null;
+		Map map = new HashMap();
 
 		try {
 			CreatePlatformEndpointRequest platformEndpointRequest = new CreatePlatformEndpointRequest();
 			platformEndpointRequest.setPlatformApplicationArn(platformApplicationArn);
 			platformEndpointRequest.setToken(token);
 
-			result = client.createPlatformEndpoint(platformEndpointRequest);
+			CreatePlatformEndpointResult resultEndpoint = client.createPlatformEndpoint(platformEndpointRequest);
+			map.put("resultEndpoint", resultEndpoint);
+			LOGGER.info("Amazon Create Endpoint reg result: " + resultEndpoint);
 
-			LOGGER.info("Amazon Push reg result: " + result);
+			SubscribeResult resultsubcirbe = client.subscribe(topicArn, "application", resultEndpoint.getEndpointArn());
+			LOGGER.info("Amazon Subscribre Topic: " + resultsubcirbe);
+			map.put("resultsubcirbe", resultsubcirbe);
 
 		} catch (SnsException e) {
 			LOGGER.info("Amazon fail Push reg result: " + e.awsErrorDetails().errorMessage());
 		}
-		return result;
+		return map;
 	}
 
-	public static DeleteEndpointResult deleteEndpoint(AmazonSNS client, String endPointArn) {
+	public static DeleteEndpointResult deleteEndpoint(AmazonSNS client, String endPointArn, String topicArn,
+			String arntopicendpoint) {
 
-		DeleteEndpointResult result = null;
+		DeleteEndpointResult resultEndpoint = null;
 
 		try {
 
 			DeleteEndpointRequest deletePlatformApplicationRequest = new DeleteEndpointRequest();
 			deletePlatformApplicationRequest.setEndpointArn(endPointArn);
 
-			result = client.deleteEndpoint(deletePlatformApplicationRequest);
+			resultEndpoint = client.deleteEndpoint(deletePlatformApplicationRequest);
+
+			LOGGER.info("Amazon Delete Endpoint reg result: " + resultEndpoint);
+
+			UnsubscribeResult resultsubcirbe = client.unsubscribe(arntopicendpoint);
+			LOGGER.info("Amazon Delete Suscription reg result: " + resultsubcirbe);
 
 		} catch (SnsException e) {
-			LOGGER.info("Amazon fail Push reg result: " + e.awsErrorDetails().errorMessage());
+			LOGGER.info("Amazon fail Delete reg result: " + e.awsErrorDetails().errorMessage());
 		}
-		return result;
+		return resultEndpoint;
 	}
 
 	private void initDynamoDbClient() {
