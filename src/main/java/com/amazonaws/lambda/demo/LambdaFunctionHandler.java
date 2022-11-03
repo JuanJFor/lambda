@@ -1,42 +1,26 @@
 package com.amazonaws.lambda.demo;
 
-import java.math.BigDecimal;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
-import com.amazonaws.lambda.demo.entity.Response;
+import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.Table;
-import com.amazonaws.services.dynamodbv2.document.spec.PutItemSpec;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.sns.AmazonSNS;
-import com.amazonaws.services.sns.AmazonSNSClient;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
 import com.amazonaws.services.sns.model.CreatePlatformEndpointRequest;
 import com.amazonaws.services.sns.model.CreatePlatformEndpointResult;
 import com.amazonaws.services.sns.model.DeleteEndpointRequest;
 import com.amazonaws.services.sns.model.DeleteEndpointResult;
-import com.amazonaws.services.sns.model.DeletePlatformApplicationRequest;
-import com.amazonaws.services.sns.model.DeletePlatformApplicationResult;
-import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
-import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
-import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
-
-import software.amazon.awssdk.services.sns.SnsClient;
+import com.google.gson.JsonObject;
 
 import software.amazon.awssdk.services.sns.model.SnsException;
-
-
-import com.amazonaws.regions.Region;
-import com.amazonaws.regions.Regions;
 
 
 public class LambdaFunctionHandler implements RequestHandler<Map<String, String>, String> {
@@ -97,18 +81,13 @@ public class LambdaFunctionHandler implements RequestHandler<Map<String, String>
 		
 		this.dynamoDb.getTable(DYNAMODB_TABLE_NAME).putItem(item);
 
-		 
-		Gson gson = new GsonBuilder()
-		       .disableHtmlEscaping()
-		       .setFieldNamingPolicy(FieldNamingPolicy.UPPER_CAMEL_CASE)
-		       .setPrettyPrinting()
-		       .serializeNulls()
-		       .create();		
+		Gson gson = new Gson();		
 		
-		Response res=new Response();
-		res.setRespose("Success");
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.addProperty("response", "Success");
 		
-		return gson.toJson(res);
+		
+		return gson.toJson(jsonObject);
 
 	}
 
