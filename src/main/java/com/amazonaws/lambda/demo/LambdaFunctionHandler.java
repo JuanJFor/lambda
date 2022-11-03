@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
+import com.amazonaws.lambda.demo.entity.Response;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
@@ -22,6 +23,9 @@ import com.amazonaws.services.sns.model.DeleteEndpointRequest;
 import com.amazonaws.services.sns.model.DeleteEndpointResult;
 import com.amazonaws.services.sns.model.DeletePlatformApplicationRequest;
 import com.amazonaws.services.sns.model.DeletePlatformApplicationResult;
+import com.google.gson.FieldNamingPolicy;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
@@ -92,10 +96,19 @@ public class LambdaFunctionHandler implements RequestHandler<Map<String, String>
 		
 		
 		this.dynamoDb.getTable(DYNAMODB_TABLE_NAME).putItem(item);
-        		
-		
 
-		return "Success";
+		 
+		Gson gson = new GsonBuilder()
+		       .disableHtmlEscaping()
+		       .setFieldNamingPolicy(FieldNamingPolicy.UPPER_CAMEL_CASE)
+		       .setPrettyPrinting()
+		       .serializeNulls()
+		       .create();		
+		
+		Response res=new Response();
+		res.setRespose("Success");
+		
+		return gson.toJson(res);
 
 	}
 
